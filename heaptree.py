@@ -76,6 +76,11 @@ class HeapTree(object):
     """Class to represent a Binary Heap as a tree.
     """
     def __init__(self, cmp=operator.le):
+        """Create an empty Heap.
+
+        Args:
+            cmp: comparison operator used to define the heap.
+        """
         self.root = None
         self._size = 0
         self.cmp = cmp
@@ -112,7 +117,8 @@ class HeapTree(object):
         return node
 
     def add(self, value):
-        # Add a value to the heap.
+        """Add a value to the heap.
+        """
         newnode = HeapNode(value)
         if self.root is None:
             self.root = newnode
@@ -131,7 +137,7 @@ class HeapTree(object):
         return newnode
 
     def _bubbleup(self, node):
-        """Moves the given node up the near-heap until it satisfies the heap
+        """Move the given node up the near-heap until it satisfies the heap
         property.
         """
         if node is not self.root:
@@ -140,7 +146,7 @@ class HeapTree(object):
                 self._bubbleup(node)
 
     def _swapnodewithparent(self, node):
-        """Swaps a node with it's parent.
+        """Swap a node with its parent.
         """
         assert node is not self.root
         parent = node.parent
@@ -185,6 +191,14 @@ class HeapTree(object):
             right.parent = parent
 
     def deleteroot(self):
+        """Remove and return the root node from the heap.
+
+        Returns:
+            the root node.
+
+        Raises:
+            IndexError: if the heap is empty.
+        """
         # Get the last inorder node in the tree.
         root = self.root
         if len(self) == 0:
@@ -238,7 +252,12 @@ class HeapTree(object):
         self._bubbleup(node)
         self._bubbledown(node)
 
-    def to_array(self):
+    def to_list(self):
+        """Returns a copy of the HeapTree as a list.
+
+        Return:
+            a list representing the same Heap as self.
+        """
         if self.root is None:
             return []
         a = []
@@ -251,6 +270,4 @@ class HeapTree(object):
             if head.right:
                 q.append(head.right)
         return a
-        
-        
 
