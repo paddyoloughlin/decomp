@@ -139,11 +139,36 @@ class HeapTree(object):
     def _bubbleup(self, node):
         """Move the given node up the near-heap until it satisfies the heap
         property.
+
+        Used when the value of a node changes
+
+        Args:
+            node: (HeapNode) node to move within the heap.
         """
         if node is not self.root:
             if self.cmp(node.value, node.parent.value):
                 self._swapnodewithparent(node)
                 self._bubbleup(node)
+
+    def _bubbledown(self, node):
+        """Move the given node down the heap until the heap property is
+        satisfied.
+
+        Used when the value of a node changes
+
+        Args:
+            node: (HeapNode) node to move within the heap.
+        """
+        left = node.left
+        right = node.right
+        largest = node
+        if left is not None and self.cmp(left.value, node.value):
+            largest = left
+        if right is not None and self.cmp(right.value, largest.value):
+            largest = right
+        if largest is not node:
+            self._swapnodewithparent(largest)
+            self._bubbledown(node)
 
     def _swapnodewithparent(self, node):
         """Swap a node with its parent.
@@ -235,18 +260,6 @@ class HeapTree(object):
         self.root.right = None
         # Replace self.root
         self.root = node
-
-    def _bubbledown(self, node):
-        left = node.left
-        right = node.right
-        largest = node
-        if left is not None and self.cmp(left.value, node.value):
-            largest = left
-        if right is not None and self.cmp(right.value, largest.value):
-            largest = right
-        if largest is not node:
-            self._swapnodewithparent(largest)
-            self._bubbledown(node)
 
     def _heapify(self, node):
         self._bubbleup(node)
