@@ -91,35 +91,79 @@ def read_model(filename):
     return verts, norms, faces
 
 
-class Edge:
+class Edge(object):
     """Class representing edge objects
     """
-    def __init__(self, a, b, vertices):
-        self.__a = min(a, b)
-        self.__b = max(a, b)
-        self.__length = self.calc_length()
-        self.__vertices = vertices
-        self.connecting_faces = set()
 
-    def __cmp__(self, other):
-        if self.__length < other.__length:
-            return -1
-        elif self.__length == other.__length:
-            return 0
-        else:
-            return 1
+    def __init__(self, a, b, length):
+        """Create an edge between vertex index a and vertex index b.
 
-    def get_length(self):
-        return self.__length
+        Args:
+            a: (int) index into an array of vertices. One endpoint of the edge.
+            b: (int) the other endpoint of the edge. Like 'a', an index into an
+                array of vertices.
+            length: (numeric) euclidean length of the edge.
+        """
+        assert a != b, "Parameters must be different. Value=%s" % str(a)
+        self.a = min(a, b)
+        self.b = max(a, b)
+        self.length = length
+
+    def cmp_shortest_edge(self, other):
+        """Compare two edges to determine which is smaller by euclidean length.
+
+        Used to provide an ordering of edges. e.g. for a min-heap of edges by
+        euclidean length.
+
+        Args:
+            other: (Edge) edge to compare this one with.
+        """
+        return self.length < other.length
+
+    def cmp_longest_edge(self, other):
+        """Compare two edges to determine which is longer by euclidean length.
+
+        Used to provide an ordering of edges. e.g. for a max-heap of edges by
+        euclidean length.
+
+        Args:
+            other: (Edge) edge to compare this one with.
+        """
+        return self.length > other.length
 
     def get_ends(self):
-        return (self.__a, self.__b)
+        """Get the ends of the edge as a tuple of vertex indices.
 
-    def calc_length(self):
-        """Determine the euclidean length of this edge.
+        Returns:
+            a 2-tuple.
         """
-        v1 = self.__vertices[self.a]
-        v2 = self.__vertices[self.b]
+        return (self.a, self.b)
+
+
+class EdgeSpace(object):
+    """A class to combine edges to list that their members index into and
+    provide some geometry calculations for them.
+    """
+    def __init__(self, vertices):
+        """Args:
+        vertices: (list) sequence of vertices that the class will use for
+        calculations.
+        """
+        self.vertices = vertices
+
+    def calc_distance(self, vertexindex1, vertexindex2):
+        """Determine the euclidean distance between two vertices.
+
+        Args:
+            vertexindex1: (int) index into self.vertices.
+            vertexindex2: (int) index into self.vertices
+
+        Returns:
+            the euclidean distance between the vertices represented by
+            vertexindex1 and vertexindex2 as a float.
+        """
+        v1 = self.vertices[vertexindex1]
+        v2 = self.vertices[vertexindex2]
 
         x = v2[0] - v1[0]
         y = v2[1] - v1[1]
@@ -127,11 +171,17 @@ class Edge:
 
         return ((x ** 2) + (y ** 2) + (z ** 2)) ** 0.5
 
-    def create_mid(self):
-        """Create a vertex which lies on the mid-point of this edge.
+    def create_mid(self, edge):
+        """Create a vertex which lies on the mid-point of edge.
+
+        Args:
+            edge: (Edge) an edge object.
+
+        Returns:
+            the mid-point of the edge as a float 3-tuple.
         """
-        v1 = self.__vertices[self.a]
-        v2 = self.__vertices[self.b]
+        v1 = self.vertices[edge.a]
+        v2 = self.vertices[edge.b]
 
         x = (v1[0] + v2[0]) / 2
         y = (v1[1] + v2[0]) / 2
@@ -139,12 +189,16 @@ class Edge:
 
         return (x, y, z)
 
+    def collapse_edge(self, edge):
+        self.vertices.append(self.create_mid(edge))
+        return len(self.vertices) - 1
 
-def create_edges(faces, verts):
+
+def create_edges(faces, edgespace):
     """Create the data structures for use in skeletonisation.
     """
-    vert2edgenode = defaultdict(set)
-    edge_heap = HeapTree()
+    edge_map = defaultdict(dict)
+    edge_heap = HeapTree(cmp=Edge.cmp_shortest_edge)
 
     print "Creating edges:"
 
@@ -153,32 +207,29 @@ def create_edges(faces, verts):
             # Create the Edge.
             p1 = f[p - 1][0]
             p2 = f[p][0]
-            edge = Edge(p1, p2, verts)
+            edge = Edge(p1, p2, edgespace.calc_distance(p1, p2))
 
             # Add it to the heap.
             edge_node = edge_heap.add(edge)
 
             # Add the node to the map of vertices to edges.
-            vert2edgenode[p1].add(edge_node)
-            vert2edgenode[p2].add(edge_node)
-
-            # Map this edge to the face it is connected to
-            edge.connecting_faces.add(f)
+            edge_map[p1][p2] = edge_node
+            edge_map[p2][p1] = edge_node
 
         percent_done = int(i / len(f))
         if percent_done % 5 == 0:
             print "%i done"
 
-    return edge_heap, vert2edgenode
+    return edge_heap, edge_map
 
 
-def skeletonise(verts, edge_heap, connections):
+def skeletonise(edgespace, edge_heap, edge_map):
     removed_edges = []
     while len(edge_heap) > 0:
-        skeletonise_step(edge_heap, verts, connections, removed_edgenodes)
+        skeletonise_step(edge_heap, edgespace, edge_map, removed_edgenodes)
 
 
-def skeletonise_step(edge_heap, verts, connections, removed_edgenodes):
+def skeletonise_step(edge_heap, edgespace, edge_map, removed_edgenodes):
     # Remove the shortest edge.
     try:
         shortest = edge_heap.deleteroot()
@@ -194,18 +245,19 @@ def skeletonise_step(edge_heap, verts, connections, removed_edgenodes):
 
     # Find the new point that this edge should be collapsed to and the index it
     # will be stored at.
-    new_vert_index = len(verts)
-    verts.append(shortest.value.create_mid())
+    new_vert_index = edgespace.collapse_edge(shortest.value)
 
     # The edges that were connected to shortest are now connected to the new
     # vertex.
     # Also, remove the connections to the old vertices from the mapping.
     for i in shortest.value.get_ends():
-        connections[new_vert_index].add(connections[i])
-        del connections[i]
+        for j, edgeinfo in edge_map[i].items():
+            # TODO: Figure out what to do here next!
+            edge_map[new_vert_index][j] = edgeinfo
+        del edge_map[i]
 
     # Remove shortest from the list of connections.
-    connections[new_vert_index].remove(shortest)
+    del edge_map[new_vert_index][shortest]
 
     # Update each of the connected edges to use the new node instead of the old.
     for edgenode in connections[new_vert_index]:
@@ -223,9 +275,10 @@ def main():
     del norms
 
     # Create edges.
-    edge_heap, connections = create_edges(faces, verts)
+    edgespace = EdgeSpace(verts)
+    edge_heap, edge_map = create_edges(faces, edgespace)
 
-    skeletonise(verts, edge_heap, connections)
+    skeletonise(edgespace, edge_heap, edge_map)
 
 
 if __name__ == '__main__':
