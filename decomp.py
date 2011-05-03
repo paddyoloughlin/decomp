@@ -90,6 +90,7 @@ def read_model(filename):
 
     return verts, norms, faces
 
+
 class Edge:
     """Class representing edge objects
     """
@@ -138,6 +139,7 @@ class Edge:
 
         return (x, y, z)
 
+
 def create_edges(faces, verts):
     """Create the data structures for use in skeletonisation.
     """
@@ -169,21 +171,26 @@ def create_edges(faces, verts):
 
     return edge_heap, vert2edgenode
 
+
 def skeletonise(verts, edge_heap, connections):
     removed_edges = []
     while len(edge_heap) > 0:
         skeletonise_step(edge_heap, verts, connections, removed_edgenodes)
 
 
-def skeletonise_step(edge_heap, verts, connections, removed_edgenodess)
+def skeletonise_step(edge_heap, verts, connections, removed_edgenodes):
     # Remove the shortest edge.
     try:
         shortest = edge_heap.deleteroot()
     except IndexError:
         # Heap is empty, so leave the loop.
-        break
+        return
 
     removed_edgenodes.append(shortest)
+
+    # TODO: Remove connected faces and add to the ATL.
+    # TODO: Ensure skeletal edges are removed from the heap and stored.
+    # TODO: Removed duplicate edges from after the collapse.
 
     # Find the new point that this edge should be collapsed to and the index it
     # will be stored at.
@@ -202,9 +209,10 @@ def skeletonise_step(edge_heap, verts, connections, removed_edgenodess)
 
     # Update each of the connected edges to use the new node instead of the old.
     for edgenode in connections[new_vert_index]:
-        edgenode.value.move(shortest.value, new_vert_index)
-        edge_heap._bubbledown(edgenode)
+        # TODO: Move edge that's connected to a vertex that's being deleted to
+        # its replacement.
         edge_heap._bubbleup(edgenode)
+        edge_heap._bubbledown(edgenode)
 
 
 def main():
@@ -218,6 +226,7 @@ def main():
     edge_heap, connections = create_edges(faces, verts)
 
     skeletonise(verts, edge_heap, connections)
+
 
 if __name__ == '__main__':
     main()
